@@ -148,13 +148,10 @@ void read_requesthdrs(rio_t *rp)
 int parse_uri(char *uri, char *filename, char *cgiargs)
 {
   char *ptr;
-  // strstr 함수: string1에서 string2의 첫 번째 표시를 찾는다.
   /* 정적 컨텐츠 */
   if (!strstr(uri, "cgi-bin")) { /* 실행파일의 홈 디렉토리인 /cgi-bin이 아닐 경우 */
-    // strcpy 함수: string2를 string1에서 지정한 위치로 복사한다.
     strcpy(cgiargs, "");
     strcpy(filename, ".");
-    // strcat 함수: string2를 string1에 연결하고 널 문자로 결과 스트링을 종료.
     strcat(filename, uri); 
     printf("%s\n", filename);
 
@@ -210,13 +207,11 @@ void serve_static(int fd, char *filename, int filesize, char *method)
   srcfd = Open(filename, O_RDONLY, 0); /* file open 가능여부 확인*/
 
   /* 요청 파일을 가상 메모리 영역으로 매핑하는 Mmap() 대신 malloc */
-  // srcp = Mmap(0, filesize, PROT_READ, MAP_PRIVATE, srcfd, 0);
   srcp = (int *)malloc(filesize);
   Rio_readn(srcfd, srcp, filesize);
   Close(srcfd); /* srcfd 식별자는 더이상 필요없어 닫음 */
   Rio_writen(fd, srcp, filesize); 
   /* 매핑된 가상 메모리 주소 반환하는 Munmap 대신 free*/
-  // Munmap(srcp, filesize);
   free(srcp);
 
 }
