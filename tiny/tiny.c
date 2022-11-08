@@ -10,12 +10,23 @@
 #include <signal.h>
 
 void doit(int fd);
-void read_requesthdrs(rio_t *rp);
+char read_requesthdrs(rio_t *rp);
 int parse_uri(char *uri, char *filename, char *cgiargs);
 void serve_static(int fd, char *filename, int filesize, char *method);
 void get_filetype(char *filename, char *filetype);
 void serve_dynamic(int fd, char *filename, char *cgiargs, char *method);
 void clienterror(int fd, char *cause, char *errnum, char *shortmsg, char *longmsg);
+
+char dest[MAXLINE];
+
+// void make_connect(){
+//     clientlen = sizeof(clientaddr);
+//     connfd = Accept(listenfd, (SA *)&clientaddr, &clientlen);  /* 반복적으로 연결 요청 접수 */
+//     Getnameinfo((SA *)&clientaddr, clientlen, hostname, MAXLINE, port, MAXLINE, 0);
+//     printf("Accepted connection from (%s, %s)\n", hostname, port); /* 도메인 이름과 연결된 클라이언트의 포트 출력*/
+//     doit(connfd);   /* 트랜잭션 수행 */
+//     Close(connfd);  /* server 연결 식별자 닫음 */
+// }
 
 int main(int argc, char **argv) 
 {
@@ -39,8 +50,8 @@ int main(int argc, char **argv)
     clientlen = sizeof(clientaddr);
     connfd = Accept(listenfd, (SA *)&clientaddr, &clientlen);  /* 반복적으로 연결 요청 접수 */
     Getnameinfo((SA *)&clientaddr, clientlen, hostname, MAXLINE, port, MAXLINE, 0);
-    printf("Accepted connection from (%s, %s)\n", hostname, port); /* 도메인 이름과 연결된 클라이언트의 포트 출력*/
-    doit(connfd);   /* 트랜잭션 수행 */
+    printf("Accepted connection from (%s, %s)\n", hostname, port); /*클라이언트의 포트 출력*/
+    doit(connfd);   /* 트랜잭션 수행 */ 
     Close(connfd);  /* server 연결 식별자 닫음 */
   }
 }
@@ -72,7 +83,13 @@ void doit(int fd)
 
   /* tiny는 요청된 헤더 읽고 무시 */
   read_requesthdrs(&rio);
+  /* 네이버의 정보를 받아와서 */
+  // 파싱을 한 결과가 우리께 아니면 make_connect 호출해서 넘기자
+  printf("<---------------------------------------------------->");
+  printf("%s\n", dest);
 
+  
+  /* 우리의 tiny server 내용을 호출하면 ;;; */
   /* 요청된 uri 해석 */
   is_static = parse_uri(uri, filename, cgiargs);
   
@@ -129,13 +146,22 @@ void clienterror(int fd, char *cause, char *errnum, char *shortmsg, char *longms
 /*
  * read_requesthdrs - request header 읽기 
  */
-void read_requesthdrs(rio_t *rp)
+char read_requesthdrs(rio_t *rp)
 {
   char buf[MAXLINE];
+  char *p;
+  // char dest[MAXLINE];
 
   Rio_readlineb(rp, buf, MAXLINE);
+  int cnt = 0;
   while(strcmp(buf, "\r\n")) {
+    cnt++;
     Rio_readlineb(rp, buf, MAXLINE);
+    if (p = strstr(&buf, "Referer")){
+      printf("잘 뽑힘");
+      printf("%s", p);
+      sscanf(p, "Referer: http://%s/", dest);
+    }
     printf("%s", buf);
   }
   return;
