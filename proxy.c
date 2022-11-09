@@ -1,7 +1,11 @@
 #include <stdio.h>
-#include "csapp.h"
 #include <stdlib.h>
+#include "csapp.h"
 #include "queue.c"
+#include "sbuf.h"
+// #include "sbuf.c"
+#define NTHREADS 4
+#define SBUFSIZE 16
 
 /* Recommended max cache and object sizes */
 #define MAX_CACHE_SIZE 1049000
@@ -13,12 +17,14 @@ static const char *user_agent_hdr =
     "Firefox/10.0.3\r\n";
 
 
+
 void doit(int fd);
 void send_request(char *uri, int fd);
 void *thread(void *vargp);
 
 char dest[MAXLINE];
 Queue queue;
+sbuf_t sbuf;
 
 
 int main(int argc, char **argv) 
@@ -39,14 +45,21 @@ int main(int argc, char **argv)
 
   listenfd = Open_listenfd(argv[1]);
 
+  sbuf_init(&sbuf, SBUFSIZE);
+  int i = 0;
+  for (i = 0; i < NTHREADS; i++) /* Create worker threads */
+  {
+    Pthread_create(&tid, NULL, thread, NULL);
+  }
+
   while (1) {
     clientlen = sizeof(clientaddr);
-    connfdp = Malloc(sizeof(int));
-    *connfdp = Accept(listenfd, (SA *)&clientaddr, &clientlen);
-    Getnameinfo((SA *)&clientaddr, clientlen, hostname, MAXLINE, port, MAXLINE, 0);
-    printf("<-----------------start of proxy server request------------------>\n");
-    printf("Accepted connection from (%s, %s)\n", hostname, port);
-    Pthread_create(&tid, NULL, thread, connfdp);
+    // connfdp = Malloc(sizeof(int));
+    connfdp = Accept(listenfd, (SA *)&clientaddr, &clientlen);
+    // Getnameinfo((SA *)&clientaddr, clientlen, hostname, MAXLINE, port, MAXLINE, 0);
+    
+    // printf("Accepted connection from (%s, %s)\n", hostname, port);
+    sbuf_insert(&sbuf, connfdp); /* Insert connfd in buffer */
     
   }
 
@@ -54,11 +67,20 @@ int main(int argc, char **argv)
 
 void *thread(void *vargp)
 {
-  int connfd = *((int *)vargp);
+
+  // int connfd = *((int *)vargp);
   Pthread_detach(pthread_self());
-  Free(vargp);
-  doit(connfd);
-  Close(connfd);
+  // Free(vargp);
+  while (1) {
+    /* Remove connfd from buffer */
+    int connfd = sbuf_remove(&sbuf);
+    printf("<-----------------start of proxy server request------------------>\n");
+    /* Service client */
+    // echo_cnt(connfd);
+    doit(connfd);
+    Close(connfd);
+  }
+  
   printf("<-----------------end of entire request------------------>\n");
   return NULL;
 }
@@ -90,14 +112,14 @@ void send_request(char *uri, int fd){
 
   // request header
   Rio_readinitb(&rio, clientfd);
-  sprintf(buf, "GET %s HTTP/1.0\r\n", uri);
-  sprintf(buf, "%sConnection: keep-alive\r\n", buf);
-  sprintf(buf, "%sCache-Control: max-age=0\r\n", buf);
-  sprintf(buf, "%sUpgrade-Insecure-Requests: 1\r\n", buf);
-  sprintf(buf, "%sUser-Agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/107.0.0.0 Safari/537.36\r\n", buf);
-  sprintf(buf, "%sAccept: text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.9", buf);
-  sprintf(buf, "%sAccept-Encoding: gzip, deflate\r\n", buf);
-  sprintf(buf, "%sAccept-Language: ko-KR,ko;q=0.9,en-US;q=0.8,en;q=0.7\r\n\r\n", buf);
+  sprintf(buf, "GET %s HTTP/1.0\r\n\r\n", new_uri);
+  // sprintf(buf, "%sConnection: keep-alive\r\n", buf);
+  // sprintf(buf, "%sCache-Control: max-age=0\r\n", buf);
+  // sprintf(buf, "%sUpgrade-Insecure-Requests: 1\r\n", buf);
+  // sprintf(buf, "%sUser-Agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/107.0.0.0 Safari/537.36\r\n", buf);
+  // sprintf(buf, "%sAccept: text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.9", buf);
+  // sprintf(buf, "%sAccept-Encoding: gzip, deflate\r\n", buf);
+  // sprintf(buf, "%sAccept-Language: ko-KR,ko;q=0.9,en-US;q=0.8,en;q=0.7\r\n\r\n", buf);
 
   Rio_writen(clientfd, buf, strlen(buf));
   printf("%s", buf);
@@ -112,8 +134,10 @@ void send_request(char *uri, int fd){
     printf("------------------dequeue %d\n", queue.count);
   }
 
+  printf("%s\n", (proxy_res));
   Enqueue(&queue, uri, &proxy_res);
   printf("----------------enqueue %d\n", queue.count);
+  
 
 
 }
@@ -143,7 +167,11 @@ void doit(int fd)
     
     if(strcmp(cache->request_line, uri) == 0){
       printf("--------------------cache hit!!\n");
-      Rio_writen(fd, cache->response, MAX_OBJECT_SIZE);
+      // printf("%s\n", (cache->response));
+      printf("before %s\n", (cache->request_line));
+      Rio_writen(fd, cache->response, strlen(cache->response));
+      printf("after %s\n", (cache->request_line));
+      // printf("111111111111111111\n");
       return;
     }
     cache = cache->next;

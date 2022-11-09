@@ -53,7 +53,6 @@ void Enqueue(Queue *queue, char *request_line, char *response)
         queue->front = now;//맨 앞을 now로 설정       
     }else//비어있지 않을 때
     {
-        printf("isNOTempty 호출");
         queue->rear->next = now;//맨 뒤의 다음을 now로 설정
     }
     queue->rear = now;//맨 뒤를 now로 설정   
