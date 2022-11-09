@@ -1,11 +1,19 @@
+//큐 - 연결리스트 이용
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 
+/* Recommended max cache and object sizes */
+#define MAX_CACHE_SIZE 1049000
+#define MAX_OBJECT_SIZE 102400
+
 typedef struct Node //노드 정의
 {
-    int data;
+    // int data;
     struct Node *next;
+    char *request_line;
+    char *response;
+
 }Node;
 
 
@@ -18,26 +26,9 @@ typedef struct Queue //Queue 구조체 정의
 
 void InitQueue(Queue *queue);//큐 초기화
 int IsEmpty(Queue *queue); //큐가 비었는지 확인
-void Enqueue(Queue *queue, int data); //큐에 보관
-int Dequeue(Queue *queue); //큐에서 꺼냄
+void Enqueue(Queue *queue, char *request_line, char *response); //큐에 보관
+void Dequeue(Queue *queue); //큐에서 꺼냄
 
-int main(void)
-{
-    int i;
-    Queue queue;
-
-    InitQueue(&queue);//큐 초기화
-    for (i = 1; i <= 5; i++)//1~5까지 큐에 보관
-    {
-        Enqueue(&queue, i);
-    }
-    while (!IsEmpty(&queue))//큐가 비어있지 않다면 반복
-    {
-        printf("%d ", Dequeue(&queue));//큐에서 꺼내온 값 출력
-    }
-    printf("\n");
-    return 0;
-}
 
 void InitQueue(Queue *queue)
 {
@@ -50,10 +41,11 @@ int IsEmpty(Queue *queue)
     return queue->count == 0;    //보관 개수가 0이면 빈 상태
 }
 
-void Enqueue(Queue *queue, int data)
+void Enqueue(Queue *queue, char *request_line, char *response)
 {
-    Node *now = (Node *)malloc(sizeof(Node)); //노드 생성
-    now->data = data;//데이터 설정
+    Node *now = (Node *)malloc(MAX_OBJECT_SIZE); //노드 생성
+    now->request_line = request_line;//데이터 설정
+    now->response = response;
     now->next = NULL;
 
     if (IsEmpty(queue))//큐가 비어있을 때
@@ -68,7 +60,7 @@ void Enqueue(Queue *queue, int data)
     queue->count++;//보관 개수를 1 증가
 }
 
-int Dequeue(Queue *queue)
+void Dequeue(Queue *queue)
 {
     int re = 0;
     Node *now;
@@ -77,9 +69,9 @@ int Dequeue(Queue *queue)
         return re;
     }
     now = queue->front;//맨 앞의 노드를 now에 기억
-    re = now->data;//반환할 값은 now의 data로 설정
+    // re = now->data;//반환할 값은 now의 data로 설정
     queue->front = now->next;//맨 앞은 now의 다음 노드로 설정
     free(now);//now 소멸
     queue->count--;//보관 개수를 1 감소
-    return re;
+    return;
 }
