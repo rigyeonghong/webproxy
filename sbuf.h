@@ -1,9 +1,9 @@
 typedef struct {
-    int *buf;       /* Buffer array */
-    int n;          /* Maximum number of slots */
-    int front;      /* buf[(front+1)%n] is first item */
-    int rear;       /* buf[rear%n] is last item */
-    sem_t mutex;    /* protects accesses to buf */
-    sem_t slots;    /* Counts available slots */
-    sem_t items;   /* Counts available items */
+    int *buf;       /* 버퍼 배열 */
+    int n;          /* 슬롯의 최대 갯수 */
+    int front;      /* buf[(front+1)%n] 는 첫 아이템 */
+    int rear;       /* buf[rear%n] 는 마지막 아이템 */
+    sem_t mutex;    /* 버퍼에 대한 접근 보호 */
+    sem_t slots;    /* 사용 가능 슬롯 수 */
+    sem_t items;    /* 사용 가능 아이템 수 */
 } sbuf_t;
