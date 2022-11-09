@@ -1,20 +1,17 @@
 #include <stdio.h>
+#include "csapp.h"
+#include <stdlib.h>
 #include "queue.c"
 
 /* Recommended max cache and object sizes */
 #define MAX_CACHE_SIZE 1049000
 #define MAX_OBJECT_SIZE 102400
 
-// #define MAX_THREAD_CNT 2
-
-
 /* You won't lose style points for including this long line in your code */
 static const char *user_agent_hdr =
     "User-Agent: Mozilla/5.0 (X11; Linux x86_64; rv:10.0.3) Gecko/20120305 "
     "Firefox/10.0.3\r\n";
 
-#include "csapp.h"
-#include <stdlib.h>
 
 void doit(int fd);
 void send_request(char *uri, int fd);
@@ -24,10 +21,8 @@ char dest[MAXLINE];
 Queue queue;
 
 
-
 int main(int argc, char **argv) 
 {
-  // 듣기 식별자, 연결 식별자 선언
   int listenfd, *connfdp;
   char hostname[MAXLINE], port[MAXLINE];
   socklen_t clientlen;
@@ -42,19 +37,15 @@ int main(int argc, char **argv)
     exit(1);
   }
 
-  // 듣기 식별자 할당
   listenfd = Open_listenfd(argv[1]);
 
   while (1) {
     clientlen = sizeof(clientaddr);
     connfdp = Malloc(sizeof(int));
-    // connfd 번호가 나온다.
     *connfdp = Accept(listenfd, (SA *)&clientaddr, &clientlen);
     Getnameinfo((SA *)&clientaddr, clientlen, hostname, MAXLINE, port, MAXLINE, 0);
-    printf("<------------proxy server request------------->\n");
+    printf("<-----------------start of proxy server request------------------>\n");
     printf("Accepted connection from (%s, %s)\n", hostname, port);
-    // peer thread 만들기
-    // Pthread_create 에서 thread 호출해서 connfd를 연결한 peer thread생성
     Pthread_create(&tid, NULL, thread, connfdp);
     
   }
@@ -68,7 +59,7 @@ void *thread(void *vargp)
   Free(vargp);
   doit(connfd);
   Close(connfd);
-
+  printf("<-----------------end of entire request------------------>\n");
   return NULL;
 }
 
@@ -94,6 +85,7 @@ void send_request(char *uri, int fd){
     
   }
 
+  // proxy - tiny
   clientfd = Open_clientfd(dest, port);
 
   // request header
@@ -115,23 +107,18 @@ void send_request(char *uri, int fd){
   Close(clientfd);
 
 
-  // 캐싱
-  // 여기의 uri 저장.
   if (queue.count > 10){
     Dequeue(&queue);
     printf("------------------dequeue %d\n", queue.count);
   }
-  // printf("%s\n", uri);
-  // printf("%s\n", proxy_res);
 
   Enqueue(&queue, uri, &proxy_res);
   printf("----------------enqueue %d\n", queue.count);
-  
 
 
 }
 
-
+// fd : telnet - proxy
 void doit(int fd)
 {
   int is_static;
@@ -149,30 +136,18 @@ void doit(int fd)
   printf("%s", buf);
   sscanf(buf, "%s %s %s", method, uri, version);
 
-  // 이미 받아본 요청이면, 캐시에서 response를 바로 보낸다.
-  // 큐를 검사해서 request_line 이 같은지 검사
-  // 같으면 불러와서 return
-  // 같지 않으면 send_request.
   
-  Node *p = queue.front;
-  while (p != NULL){
+
+  Node *cache = queue.front;
+  while (cache != NULL){
     
-    printf("^^^^^^^^^^^^^^^^^^^%s\n", (p->request_line));
-    if(!strcmp(p->request_line, &uri)){
+    if(strcmp(cache->request_line, uri) == 0){
       printf("--------------------cache hit!!\n");
-      Rio_writen(fd, p->response, MAX_OBJECT_SIZE);
-      Close(fd);
+      Rio_writen(fd, cache->response, MAX_OBJECT_SIZE);
       return;
     }
-    p = p->next;
+    cache = cache->next;
   }
   
   send_request(&uri, fd);
 }
-
-// 캐시 히트 안남
-// 지금 이 상태로 했더니 seg폴트 안남.
-// request_line uri랑 비교 how?
-
-// not found 왜 나는지 모름
-// 

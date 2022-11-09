@@ -2,6 +2,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include "csapp.h"
 
 /* Recommended max cache and object sizes */
 #define MAX_CACHE_SIZE 1049000
@@ -11,8 +12,8 @@ typedef struct Node //노드 정의
 {
     // int data;
     struct Node *next;
-    char *request_line;
-    char *response;
+    char request_line[MAXLINE];
+    char response[MAXLINE];
 
 }Node;
 
@@ -43,17 +44,16 @@ int IsEmpty(Queue *queue)
 
 void Enqueue(Queue *queue, char *request_line, char *response)
 {
-    Node *now = (Node *)malloc(MAX_OBJECT_SIZE); //노드 생성
-    now->request_line = request_line;//데이터 설정
-    now->response = response;
+    Node *now = (Node *)calloc(1, MAX_OBJECT_SIZE); //노드 생성
+    strcpy(now->request_line, request_line);//데이터 설정
+    strcpy(now->response, response);
     now->next = NULL;
-
     if (IsEmpty(queue))//큐가 비어있을 때
     {
         queue->front = now;//맨 앞을 now로 설정       
-    }
-    else//비어있지 않을 때
+    }else//비어있지 않을 때
     {
+        printf("isNOTempty 호출");
         queue->rear->next = now;//맨 뒤의 다음을 now로 설정
     }
     queue->rear = now;//맨 뒤를 now로 설정   
