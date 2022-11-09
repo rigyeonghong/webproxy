@@ -1,11 +1,12 @@
-// telnet 143.248.225.88 3000
-// GET http://143.248.225.88:5000/ HTTP/1.1
-
 #include <stdio.h>
+#include "queue.c"
 
 /* Recommended max cache and object sizes */
 #define MAX_CACHE_SIZE 1049000
 #define MAX_OBJECT_SIZE 102400
+
+// #define MAX_THREAD_CNT 2
+
 
 /* You won't lose style points for including this long line in your code */
 static const char *user_agent_hdr =
@@ -16,11 +17,13 @@ static const char *user_agent_hdr =
 #include <stdlib.h>
 
 void doit(int fd);
-int send_request(char *uri, char *port, int fd);
+void send_request(char *uri, int fd);
 void *thread(void *vargp);
 
 char dest[MAXLINE];
-// char port[MAXLINE];
+Queue queue;
+
+
 
 int main(int argc, char **argv) 
 {
@@ -30,6 +33,8 @@ int main(int argc, char **argv)
   socklen_t clientlen;
   struct sockaddr_storage clientaddr;
   pthread_t tid;
+  
+  InitQueue(&queue);//큐 초기화
 
   /* Check command line args */
   if (argc != 2) {
@@ -61,64 +66,21 @@ void *thread(void *vargp)
   int connfd = *((int *)vargp);
   Pthread_detach(pthread_self());
   Free(vargp);
-  // echo(connfd);
   doit(connfd);
   Close(connfd);
 
   return NULL;
 }
 
-int send_request(char *uri, char *port, int fd){
+void send_request(char *uri, int fd){
 
   int clientfd;
-  char buf[MAXLINE], proxy_res[MAX_OBJECT_SIZE];
+  char buf[MAXLINE], proxy_res[MAX_OBJECT_SIZE], tmp[MAX_OBJECT_SIZE], tmp2[MAX_OBJECT_SIZE], port[MAX_OBJECT_SIZE], new_uri[MAX_OBJECT_SIZE];
   rio_t rio;
-  clientfd = Open_clientfd(dest, port);
-  // printf("%d\n", clientfd);
+  char *p, *q;
 
-  Rio_readinitb(&rio, clientfd);
-  sprintf(buf, "GET %s HTTP/1.0\r\n", uri);
-  sprintf(buf, "%sConnection: keep-alive\r\n", buf);
-  sprintf(buf, "%sCache-Control: max-age=0\r\n", buf);
-  sprintf(buf, "%sUpgrade-Insecure-Requests: 1\r\n", buf);
-  sprintf(buf, "%sUser-Agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/107.0.0.0 Safari/537.36\r\n", buf);
-  sprintf(buf, "%sAccept: text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.9", buf);
-  sprintf(buf, "%sAccept-Encoding: gzip, deflate\r\n", buf);
-  sprintf(buf, "%sAccept-Language: ko-KR,ko;q=0.9,en-US;q=0.8,en;q=0.7\r\n\r\n", buf);
-
-  Rio_writen(clientfd, buf, strlen(buf));
-  // printf("---------------------------------------\n");
-  printf("%s", buf);
-  Rio_readnb(&rio, proxy_res, MAX_OBJECT_SIZE);
-  // printf("%s", proxy_res);
-
-  Rio_writen(fd, proxy_res, MAX_OBJECT_SIZE);
-  Close(clientfd);
-  // exit(0);
-
-}
-
-
-void doit(int fd)
-{
-  int is_static;
-  struct stat sbuf;
-  char buf[MAXLINE], method[MAXLINE], uri[MAXLINE], version[MAXLINE], new_uri[MAXLINE], port[MAXLINE], tmp[MAXLINE], tmp2[MAXLINE];
-  char filename[MAXLINE], cgiargs[MAXLINE];
-  rio_t rio;
-  char *p, *q, *r;
-
-  /* Read request line and headers */
-  Rio_readinitb(&rio, fd);
-  Rio_readlineb(&rio, buf, MAXLINE);
-
-  printf("Request line:\n");
-  printf("%s", buf);
-  sscanf(buf, "%s %s %s", method, uri, version);
-
+  // uri 파싱
   sscanf(strstr(uri, "http://"), "http://%s", tmp);
-  
-  
   if((p = strchr(tmp, ':')) != NULL){
     *p = '\0';
     sscanf(tmp, "%s", dest);
@@ -132,6 +94,85 @@ void doit(int fd)
     
   }
 
+  clientfd = Open_clientfd(dest, port);
 
-  send_request(new_uri, port, fd);
+  // request header
+  Rio_readinitb(&rio, clientfd);
+  sprintf(buf, "GET %s HTTP/1.0\r\n", uri);
+  sprintf(buf, "%sConnection: keep-alive\r\n", buf);
+  sprintf(buf, "%sCache-Control: max-age=0\r\n", buf);
+  sprintf(buf, "%sUpgrade-Insecure-Requests: 1\r\n", buf);
+  sprintf(buf, "%sUser-Agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/107.0.0.0 Safari/537.36\r\n", buf);
+  sprintf(buf, "%sAccept: text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.9", buf);
+  sprintf(buf, "%sAccept-Encoding: gzip, deflate\r\n", buf);
+  sprintf(buf, "%sAccept-Language: ko-KR,ko;q=0.9,en-US;q=0.8,en;q=0.7\r\n\r\n", buf);
+
+  Rio_writen(clientfd, buf, strlen(buf));
+  printf("%s", buf);
+  Rio_readnb(&rio, proxy_res, MAX_OBJECT_SIZE);
+
+  Rio_writen(fd, proxy_res, MAX_OBJECT_SIZE);
+  Close(clientfd);
+
+
+  // 캐싱
+  // 여기의 uri 저장.
+  if (queue.count > 10){
+    Dequeue(&queue);
+    printf("------------------dequeue %d\n", queue.count);
+  }
+  // printf("%s\n", uri);
+  // printf("%s\n", proxy_res);
+
+  Enqueue(&queue, uri, &proxy_res);
+  printf("----------------enqueue %d\n", queue.count);
+  
+
+
 }
+
+
+void doit(int fd)
+{
+  int is_static;
+  struct stat sbuf;
+  char buf[MAXLINE], method[MAXLINE], uri[MAXLINE], version[MAXLINE];
+  char filename[MAXLINE], cgiargs[MAXLINE];
+  rio_t rio;
+  
+
+  /* Read request line and headers */
+  Rio_readinitb(&rio, fd);
+  Rio_readlineb(&rio, buf, MAXLINE);
+
+  printf("Request line:\n");
+  printf("%s", buf);
+  sscanf(buf, "%s %s %s", method, uri, version);
+
+  // 이미 받아본 요청이면, 캐시에서 response를 바로 보낸다.
+  // 큐를 검사해서 request_line 이 같은지 검사
+  // 같으면 불러와서 return
+  // 같지 않으면 send_request.
+  
+  Node *p = queue.front;
+  while (p != NULL){
+    
+    printf("^^^^^^^^^^^^^^^^^^^%s\n", (p->request_line));
+    if(!strcmp(p->request_line, &uri)){
+      printf("--------------------cache hit!!\n");
+      Rio_writen(fd, p->response, MAX_OBJECT_SIZE);
+      Close(fd);
+      return;
+    }
+    p = p->next;
+  }
+  
+  send_request(&uri, fd);
+}
+
+// 캐시 히트 안남
+// 지금 이 상태로 했더니 seg폴트 안남.
+// request_line uri랑 비교 how?
+
+// not found 왜 나는지 모름
+// 
