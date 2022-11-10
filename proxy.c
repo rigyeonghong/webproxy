@@ -90,7 +90,7 @@ void send_request(char *uri, int fd){
 
   /* 전달 받은 uri 파싱 */
   sscanf(strstr(uri, "http://"), "http://%s", tmp);
-  if((p = strchr(tmp, ':')) != NULL){
+  if((p = strchr(tmp, ':')) != NULL){ // 포트 번호가 함께 들어온 경우
     *p = '\0';
     sscanf(tmp, "%s", dest);
     sscanf(p+1, "%s", tmp2);
@@ -100,6 +100,12 @@ void send_request(char *uri, int fd){
     sscanf(tmp2, "%s", port);
     *q = '/';
     sscanf(q, "%s", new_uri);
+  }else{
+    p = strchr(arg1, '/');
+    *p = '\0';
+    sscanf(arg1, "%s", dest);
+    *p = '/';
+    sscanf(p, "%s", new_uri);
   }
 
   /* client에서 요청한 server와 proxy server 연결 식별자 */
